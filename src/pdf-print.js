@@ -11,8 +11,12 @@ const pdfPrint2 = require("unix-print");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
+const { store } = require("../tools/utils");
+const dayjs = require("dayjs");
+const { v7: uuidv7 } = require("uuid");
 
-const printPdfFunction = process.platform === "win32" ? pdfPrint1.print : pdfPrint2.print;
+const printPdfFunction =
+  process.platform === "win32" ? pdfPrint1.print : pdfPrint2.print;
 
 const randomStr = () => {
   return Math.random()
@@ -34,13 +38,24 @@ const realPrint = (pdfPath, printer, data, resolve, reject) => {
     // pdf打印文档：https://www.sumatrapdfreader.org/docs/Command-line-arguments
     // pdf-to-printer 源码: https://github.com/artiebits/pdf-to-printer
     let pdfOptions = Object.assign(data, { pageSize: data.paperName });
-    printPdfFunction(pdfPath, pdfOptions).then(console.log);
+    printPdfFunction(pdfPath, pdfOptions)
+      .then(() => {
+        resolve();
+      })
+      .catch(() => {
+        reject();
+      });
   } else {
     // 参数见 lp 命令 使用方法
     let options = [];
-    printPdfFunction(pdfPath, printer, options).then(console.log);
+    printPdfFunction(pdfPath, printer, options)
+      .then(() => {
+        resolve();
+      })
+      .catch(() => {
+        reject();
+      });
   }
-  resolve();
 };
 
 const printPdf = (pdfPath, printer, data) => {
@@ -50,11 +65,16 @@ const printPdf = (pdfPath, printer, data) => {
         reject("pdfPath must be a string");
       }
       if (/^https?:\/\/.+/.test(pdfPath)) {
-        const client = pdfPath.startsWith("https") ? require("https") : require("http");
+        const client = pdfPath.startsWith("https")
+          ? require("https")
+          : require("http");
         client
           .get(pdfPath, (res) => {
-            const toSaveFilename = randomStr() + "_hiprint.pdf";
-            const toSavePath = path.join(os.tmpdir(), toSaveFilename);
+            const toSavePath = path.join(
+              store.get("pdfPath") || os.tmpdir(),
+              "url_pdf",
+              dayjs().format(`YYYY_MM_DD HH_mm_ss_`) + `${uuidv7()}.pdf`,
+            );
 
             const file = fs.createWriteStream(toSavePath);
             res.pipe(file);

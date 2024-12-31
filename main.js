@@ -1,7 +1,7 @@
 /*
  * @Date: 2024-01-25 15:52:14
  * @LastEditors: Jambooy 1140142559@qq.com
- * @LastEditTime: 2024-12-20 10:36:08
+ * @LastEditTime: 2024-12-31 17:28:51
  * @FilePath: \electron-hiprint\main.js
  */
 const {
@@ -13,38 +13,44 @@ const {
   Tray,
   Menu,
   shell,
-} = require('electron')
-const path = require('path')
-const server = require('http').createServer()
-const helper = require('./src/helper')
-const printSetup = require('./src/print')
-const setSetup = require('./src/set')
-const log = require('./tools/log')
+} = require("electron");
+const path = require("path");
+const server = require("http").createServer();
+const helper = require("./src/helper");
+const printSetup = require("./src/print");
+const renderSetup = require("./src/render");
+const setSetup = require("./src/set");
+const printLogSetup = require("./src/printLog");
+const log = require("./tools/log");
 const {
   store,
   address,
   initServeEvent,
   initClientEvent,
-} = require('./tools/utils')
-const { machineIdSync } = require('node-machine-id')
-const TaskRunner = require('concurrent-tasks')
+} = require("./tools/utils");
+const { machineIdSync } = require("node-machine-id");
+const TaskRunner = require("concurrent-tasks");
 
 // 主进程
-global.MAIN_WINDOW = null
+global.MAIN_WINDOW = null;
 // 托盘
-global.APP_TRAY = null
+global.APP_TRAY = null;
 // 打印窗口
-global.PRINT_WINDOW = null
+global.PRINT_WINDOW = null;
 // 设置窗口
-global.SET_WINDOW = null
+global.SET_WINDOW = null;
+// 渲染窗口
+global.RENDER_WINDOW = null;
+// 打印日志窗口
+global.PRINT_LOG_WINDOW = null;
 // socket.io 服务端
-global.SOCKET_SERVER = null
+global.SOCKET_SERVER = null;
 // socket.io-client 客户端
-global.SOCKET_CLIENT = null
+global.SOCKET_CLIENT = null;
 // 打印队列，解决打印并发崩溃问题
-global.PRINT_RUNNER = new TaskRunner({ concurrency: 1 })
+global.PRINT_RUNNER = new TaskRunner({ concurrency: 1 });
 // 打印队列 done 集合
-global.PRINT_RUNNER_DONE = {}
+global.PRINT_RUNNER_DONE = {};
 // 分批打印任务的打印任务信息
 global.PRINT_FRAGMENTS_MAPPING = {
   // [id: string]: { // 当前打印任务id，当此任务完成或超过指定时间会删除该对象
@@ -55,10 +61,12 @@ global.PRINT_FRAGMENTS_MAPPING = {
   //      updateTime: number, // 最后更新此任务信息的时间戳，用于超时时移除此对象
   //   }
   // }
-}
+};
+global.RENDER_RUNNER = new TaskRunner({ concurrency: 1 });
+global.RENDER_RUNNER_DONE = {};
 
 // socket.io 服务端，用于创建本地服务
-const ioServer = (global.SOCKET_SERVER = new require('socket.io')(server, {
+const ioServer = (global.SOCKET_SERVER = new require("socket.io")(server, {
   pingInterval: 10000,
   pingTimeout: 5000,
   maxHttpBufferSize: 10000000000,
@@ -69,76 +77,83 @@ const ioServer = (global.SOCKET_SERVER = new require('socket.io')(server, {
     // 兼容 Socket.IO 2.x
     origin: (requestOrigin, callback) => {
       // 允许所有域名连接
-      callback(null, requestOrigin)
+      callback(null, requestOrigin);
     },
-    methods: 'GET, POST, PUT, DELETE, OPTIONS',
-    allowedHeaders: '*',
+    methods: "GET, POST, PUT, DELETE, OPTIONS",
+    allowedHeaders: "*",
     // 详情参数见 https://www.npmjs.com/package/cors
     credentials: false,
   },
-}))
+}));
 
 // socket.io 客户端，用于连接中转服务
-const ioClient = require('socket.io-client').io
+const ioClient = require("socket.io-client").io;
 
 /**
  * @description: 初始化
  */
 async function initialize() {
   // 限制一个窗口
-  const gotTheLock = app.requestSingleInstanceLock()
+  const gotTheLock = app.requestSingleInstanceLock();
   if (!gotTheLock) {
     // 销毁所有窗口、托盘、退出应用
-    helper.appQuit()
+    helper.appQuit();
   }
 
+  app.setAppLogsPath(store.get("logPath"));
+
   // 当运行第二个实例时,聚焦到 MAIN_WINDOW 这个窗口
-  app.on('second-instance', () => {
+  app.on("second-instance", () => {
     if (MAIN_WINDOW) {
       if (MAIN_WINDOW.isMinimized()) {
         // 将窗口从最小化状态恢复到以前的状态
-        MAIN_WINDOW.restore()
+        MAIN_WINDOW.restore();
       }
-      MAIN_WINDOW.focus()
+      MAIN_WINDOW.focus();
     }
-  })
+  });
 
   // 允许渲染进程创建通知
-  ipcMain.on('notification', (event, data) => {
-    const notification = new Notification(data)
+  ipcMain.on("notification", (event, data) => {
+    const notification = new Notification(data);
     // 显示通知
-    notification.show()
-  })
+    notification.show();
+  });
 
   // 打开设置窗口
-  ipcMain.on('openSetting', openSetWindow)
+  ipcMain.on("openSetting", openSetWindow);
 
   // 获取设备唯一id
-  ipcMain.on('getMachineId', (event) => {
-    event.sender.send('machineId', machineIdSync({ original: true }))
-  })
+  ipcMain.on("getMachineId", (event) => {
+    try {
+      const machineId = machineIdSync({ original: true });
+      event.sender.send("machineId", machineId);
+    } catch (error) {
+      event.sender.send("machineId", "");
+    }
+  });
 
   // 获取设备ip、mac等信息
-  ipcMain.on('getAddress', (event) => {
+  ipcMain.on("getAddress", (event) => {
     address.all().then((obj) => {
-      event.sender.send('address', {
+      event.sender.send("address", {
         ...obj,
-        port: store.get('port'),
-      })
-    })
-  })
+        port: store.get("port"),
+      });
+    });
+  });
 
   // 当electron完成初始化
   app.whenReady().then(() => {
     // 创建浏览器窗口
-    createWindow()
-    app.on('activate', function() {
+    createWindow();
+    app.on("activate", function() {
       if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow()
+        createWindow();
       }
-    })
-    log('==> 华上蜂后台打印服务 启动 <==')
-  })
+    });
+    log("==> 华上蜂打印服务 启动 <==");
+  });
 }
 
 /**
@@ -149,106 +164,107 @@ async function createWindow() {
   const windowOptions = {
     width: 500, // 窗口宽度
     height: 300, // 窗口高度
-    title: store.get('mainTitle') || '华上蜂打印服务',
+    title: store.get("mainTitle") || "华上蜂打印服务",
     useContentSize: true, // 窗口大小不包含边框
     center: true, // 居中
     resizable: false, // 不可缩放
-    show: store.get('openAsHidden') ? false : true, // 显示
+    show: store.get("openAsHidden") ? false : true, // 显示
     webPreferences: {
       // 设置此项为false后，才可在渲染进程中使用 electron api
       contextIsolation: false,
       nodeIntegration: true,
     },
-  }
+  };
 
   // 窗口左上角图标
   if (!app.isPackaged) {
-    windowOptions.icon = path.join(__dirname, 'build/icons/256x256.png')
+    windowOptions.icon = path.join(__dirname, "build/icons/256x256.png");
   } else {
     app.setLoginItemSettings({
-      openAtLogin: store.get('openAtLogin'),
-      openAsHidden: store.get('openAsHidden'),
-    })
+      openAtLogin: store.get("openAtLogin"),
+      openAsHidden: store.get("openAsHidden"),
+    });
   }
 
   // 创建主窗口
-  MAIN_WINDOW = new BrowserWindow(windowOptions)
+  MAIN_WINDOW = new BrowserWindow(windowOptions);
 
   // 添加加载页面 解决白屏的问题
-  loadingView(windowOptions)
+  loadingView(windowOptions);
 
   // 初始化系统设置
-  systemSetup()
+  systemSetup();
 
   // 加载主页面
-  const indexHtml = path.join('file://', app.getAppPath(), 'assets/index.html')
-  MAIN_WINDOW.webContents.loadURL(indexHtml)
-
-  // 未打包时打开开发者工具
-  if (!app.isPackaged) {
-    MAIN_WINDOW.webContents.openDevTools()
-  }
+  const indexHtml = path.join("file://", app.getAppPath(), "assets/index.html");
+  MAIN_WINDOW.webContents.loadURL(indexHtml);
 
   // 退出
-  MAIN_WINDOW.on('closed', () => {
-    MAIN_WINDOW = null
-    server.close()
-  })
+  MAIN_WINDOW.on("closed", () => {
+    MAIN_WINDOW = null;
+    server.close();
+  });
 
   // 点击关闭，最小化到托盘
-  MAIN_WINDOW.on('close', (event) => {
-    if (store.get('closeType') === 'tray') {
+  MAIN_WINDOW.on("close", (event) => {
+    if (store.get("closeType") === "tray") {
       // 最小化到托盘
-      MAIN_WINDOW.hide()
+      MAIN_WINDOW.hide();
 
       // 隐藏任务栏
-      MAIN_WINDOW.setSkipTaskbar(true)
+      MAIN_WINDOW.setSkipTaskbar(true);
 
       // 阻止窗口关闭
-      event.preventDefault()
+      event.preventDefault();
     } else {
       // 销毁所有窗口、托盘、退出应用
-      helper.appQuit()
+      helper.appQuit();
     }
-  })
+  });
 
   // 主窗口 Dom 加载完毕
-  MAIN_WINDOW.webContents.on('dom-ready', async () => {
+  MAIN_WINDOW.webContents.on("dom-ready", async () => {
     try {
+      // 未打包时打开开发者工具
+      if (!app.isPackaged) {
+        MAIN_WINDOW.webContents.openDevTools();
+      }
       // 本地服务开启端口监听
-      server.listen(store.get('port') || 17521)
+      server.listen(store.get("port") || 17521);
       // 初始化本地 服务端事件
-      initServeEvent(ioServer)
+      initServeEvent(ioServer);
       // 有配置中转服务时连接中转服务
       if (
-        store.get('connectTransit') &&
-        store.get('transitUrl') &&
-        store.get('transitToken')
+        store.get("connectTransit") &&
+        store.get("transitUrl") &&
+        store.get("transitToken")
       ) {
-        global.SOCKET_CLIENT = ioClient(store.get('transitUrl'), {
-          transports: ['websocket'],
+        global.SOCKET_CLIENT = ioClient(store.get("transitUrl"), {
+          transports: ["websocket"],
           query: {
-            client: 'electron-hiprint',
+            client: "electron-hiprint",
           },
           auth: {
-            token: store.get('transitToken'),
+            token: store.get("transitToken"),
           },
-        })
+        });
 
         // 初始化中转 客户端事件
-        initClientEvent()
+        initClientEvent();
       }
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  })
+  });
 
   // 初始化托盘
-  initTray()
+  initTray();
   // 打印窗口初始化
-  await printSetup()
+  await printSetup();
+  // 渲染窗口初始化
+  await renderSetup();
 
-  return MAIN_WINDOW
+  return MAIN_WINDOW;
 }
 
 /**
@@ -257,26 +273,26 @@ async function createWindow() {
  * @return {Void}
  */
 function loadingView(windowOptions) {
-  const loadingBrowserView = new BrowserView()
-  MAIN_WINDOW.setBrowserView(loadingBrowserView)
+  const loadingBrowserView = new BrowserView();
+  MAIN_WINDOW.setBrowserView(loadingBrowserView);
   loadingBrowserView.setBounds({
     x: 0,
     y: 0,
     width: windowOptions.width,
     height: windowOptions.height,
-  })
+  });
 
   const loadingHtml = path.join(
-    'file://',
+    "file://",
     app.getAppPath(),
-    'assets/loading.html'
-  )
-  loadingBrowserView.webContents.loadURL(loadingHtml)
+    "assets/loading.html",
+  );
+  loadingBrowserView.webContents.loadURL(loadingHtml);
 
   // 主窗口 dom 加载完毕，移除 loadingBrowserView
-  MAIN_WINDOW.webContents.on('dom-ready', async (event) => {
-    MAIN_WINDOW.removeBrowserView(loadingBrowserView)
-  })
+  MAIN_WINDOW.webContents.on("dom-ready", async (event) => {
+    MAIN_WINDOW.removeBrowserView(loadingBrowserView);
+  });
 }
 
 /**
@@ -285,7 +301,7 @@ function loadingView(windowOptions) {
  */
 function systemSetup() {
   // 隐藏菜单栏
-  Menu.setApplicationMenu(null)
+  Menu.setApplicationMenu(null);
 }
 
 /**
@@ -293,59 +309,65 @@ function systemSetup() {
  * @return {Tray} APP_TRAY 托盘实例
  */
 function initTray() {
-  let trayPath = path.join(app.getAppPath(), 'assets/icons/tray.png')
+  let trayPath = path.join(app.getAppPath(), "assets/icons/tray.png");
 
-  APP_TRAY = new Tray(trayPath)
+  APP_TRAY = new Tray(trayPath);
 
   // 托盘提示标题
-  APP_TRAY.setToolTip('华上蜂后台打印服务')
+  APP_TRAY.setToolTip("hiprint");
 
   // 托盘菜单
   const trayMenuTemplate = [
     {
-      label: '设置',
+      label: "设置",
       click: () => {
-        if (!SET_WINDOW) {
-          setSetup()
+        openSetWindow();
+      },
+    },
+    {
+      label: "软件日志",
+      click: () => {
+        shell.openPath(app.getPath("logs"));
+      },
+    },
+    {
+      label: "打印记录",
+      click: () => {
+        if (!PRINT_LOG_WINDOW) {
+          printLogSetup();
         } else {
-          SET_WINDOW.show()
+          PRINT_LOG_WINDOW.show();
         }
       },
     },
     {
-      label: '查看日志',
+      label: "退出",
       click: () => {
-        shell.openPath(app.getPath('logs'))
+        helper.appQuit();
       },
     },
-    {
-      label: '退出',
-      click: () => {
-        helper.appQuit()
-      },
-    },
-  ]
+  ];
 
-  APP_TRAY.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate))
+  APP_TRAY.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate));
 
   // 监听点击事件
-  APP_TRAY.on('click', function() {
+  APP_TRAY.on("click", function() {
     if (MAIN_WINDOW.isMinimized()) {
       // 将窗口从最小化状态恢复到以前的状态
-      MAIN_WINDOW.restore()
-      MAIN_WINDOW.setSkipTaskbar(false)
+      MAIN_WINDOW.restore();
+      MAIN_WINDOW.setSkipTaskbar(false);
     }
     if (!MAIN_WINDOW.isVisible()) {
       // 主窗口关闭不会被销毁，只是隐藏，重新显示即可
-      MAIN_WINDOW.show()
-      MAIN_WINDOW.setSkipTaskbar(false)
+      MAIN_WINDOW.show();
+      MAIN_WINDOW.setSkipTaskbar(false);
     }
     if (!MAIN_WINDOW.isFocused()) {
       // 主窗口未聚焦，使其聚焦
-      MAIN_WINDOW.focus()
+      MAIN_WINDOW.focus();
     }
-  })
-  return APP_TRAY
+  });
+  return APP_TRAY;
 }
 
 /**
@@ -354,12 +376,12 @@ function initTray() {
  */
 async function openSetWindow() {
   if (!SET_WINDOW) {
-    await setSetup()
+    await setSetup();
   } else {
-    SET_WINDOW.show()
+    SET_WINDOW.show();
   }
-  return SET_WINDOW
+  return SET_WINDOW;
 }
 
 // 初始化主窗口
-initialize()
+initialize();

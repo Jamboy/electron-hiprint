@@ -53,7 +53,7 @@
             插件版本：{{ pluginVersion }}
           </div>
           <div class="message">
-            客户端版本：{{ process.env.npm_package_version }}
+            客户端版本：{{ version }}
           </div> -->
       </div>
     </div>
@@ -63,7 +63,9 @@
     const Store = require("electron-store")
     const store = new Store()
 
-    document.title = store.get("mainTitle") || "华上蜂后台打印服务"
+    const { version } = require("../package.json")
+
+    document.title = store.get("mainTitle") || "Electron-hiprint"
 
     let ipc = ipcRenderer
     new Vue({
@@ -76,8 +78,8 @@
           transitActiveFlag: false,
           socketActiveNum: 0,
           printing: false,
-          version: "1.0.10",
           pluginVersion: store.get("pluginVersion") || "未指定",
+          version
         }
       },
       created() {
