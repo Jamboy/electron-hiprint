@@ -7,6 +7,8 @@ const { Jimp } = require("jimp");
 const dayjs = require("dayjs");
 
 const log = require("../tools/log");
+const { store } = require("../tools/utils");
+const db = require("../tools/database");
 
 // 这是 1920 * 1080 屏幕常规工作区域尺寸
 let windowWorkArea = {
@@ -74,6 +76,9 @@ async function createRenderWindow() {
       contextIsolation: false, // 设置此项为false后，才可在渲染进程中使用electron api
       nodeIntegration: true,
     },
+    // 为窗口设置背景色可能优化字体模糊问题
+    // https://www.electronjs.org/zh/docs/latest/faq#文字看起来很模糊这是什么原因造成的怎么解决这个问题呢
+    backgroundColor: "#fff",
   };
 
   // 创建打印窗口
@@ -349,6 +354,10 @@ async function printFun(event, data) {
       defaultPrinter = element.name;
     }
   });
+  const storeDefaultPrinter = store.get("defaultPrinter"); // 获取store是否设置有保存打印机
+  if (storeDefaultPrinter !== "" && !havePrinter) {
+    defaultPrinter = storeDefaultPrinter;
+  }
   if (printerError) {
     log(
       `${data.replyId ? "中转服务" : "插件端"} ${socket.id} 模板 【${
@@ -367,6 +376,28 @@ async function printFun(event, data) {
     return;
   }
   let deviceName = havePrinter ? data.printer : defaultPrinter;
+
+  const logPrintResult = (status, errorMessage = "") => {
+    db.run(
+      `INSERT INTO print_logs (socketId, clientType, printer, templateId, data, pageNum, status, errorMessage) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        socket?.id,
+        data.clientType,
+        deviceName,
+        data.templateId,
+        JSON.stringify(data),
+        data.pageNum,
+        status,
+        errorMessage,
+      ],
+      (err) => {
+        if (err) {
+          console.error("Failed to log print result", err);
+        }
+      },
+    );
+  };
+
   // 打印 详见https://www.electronjs.org/zh/docs/latest/api/web-contents
   RENDER_WINDOW.webContents.print(
     {
@@ -404,6 +435,7 @@ async function printFun(event, data) {
             templateId: data.templateId,
             replyId: data.replyId,
           };
+          logPrintResult("success");
           socket.emit("render-print-success", result);
         } else {
           log(
@@ -411,6 +443,7 @@ async function printFun(event, data) {
               data.templateId
             }】 打印失败，打印类型 JSON，打印机：${deviceName}，原因：${failureReason}`,
           );
+          logPrintResult("failure", failureReason);
           socket.emit("render-print-error", {
             msg: failureReason,
             templateId: data.templateId,
