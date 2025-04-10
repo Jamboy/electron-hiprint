@@ -34,12 +34,12 @@
   position: relative;
 }
 
-/* 火狐浏览器打印 第一页过后 重叠问题 */
+/* ����羌頵������� 膃��蕁笈��� ������� */
 @-moz-document url-prefix() {
   .hiprint-printPaper .hiprint-printPaper-content {
     position: relative;
     margin-top: 20px;
-    top: -20px
+    top: -20px;
   }
 }
 
@@ -47,12 +47,12 @@
   overflow: visible;
 }
 
-
 .hiprint-printTemplate .hiprint-printPanel {
   page-break-after: always;
 }
 
-.hiprint-printPaper, hiprint-printPanel {
+.hiprint-printPaper,
+hiprint-printPanel {
   box-sizing: border-box;
   border: 0px;
 }
@@ -77,7 +77,8 @@
   border: 1px dashed rgba(170, 170, 170, 0.7);
 }
 
-.design .hiprint-printElement-table-content, .design .hiprint-printElement-longText-content {
+.design .hiprint-printElement-table-content,
+.design .hiprint-printElement-longText-content {
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -136,7 +137,6 @@
   /*white-space: pre-wrap*/
 }
 
-
 .hiprint-printElement-table {
   background-color: transparent;
   background-repeat: repeat;
@@ -164,7 +164,13 @@
   font-weight: 700;
 }
 
-.hiprint-printElement-tableTarget, .hiprint-printElement-tableTarget tr, .hiprint-printElement-tableTarget td {
+table.hiprint-printElement-tableTarget {
+  width: 100%;
+}
+
+.hiprint-printElement-tableTarget,
+.hiprint-printElement-tableTarget tr,
+.hiprint-printElement-tableTarget td {
   border-color: rgb(0, 0, 0);
   /*border-style: none;*/
   /*border: 1px solid rgb(0, 0, 0);*/
@@ -213,8 +219,18 @@
 .hiprint-printElement-tableTarget-border-td-none td {
   border: 0px solid;
 }
-.hiprint-printElement-tableTarget-border-td-all td:not(:last-child) {
+.hiprint-printElement-tableTarget-border-td-all
+  td:not(:nth-last-child(-n + 2)) {
   border-right: 1px solid;
+}
+.hiprint-printElement-tableTarget-border-td-all td:not(last-child) {
+  border-right: 1px solid;
+}
+.hiprint-printElement-tableTarget-border-td-all td:last-child {
+  border-left: 1px solid;
+}
+.hiprint-printElement-tableTarget-border-td-all td:last-child:first-child {
+  border-left: none;
 }
 
 /*.hiprint-printElement-tableTarget tr,*/
@@ -240,9 +256,9 @@
   color: gainsboro !important;
 }
 
-.hiprint-printElement-vline, .hiprint-printElement-hline {
+.hiprint-printElement-vline,
+.hiprint-printElement-hline {
   border: 0px none rgb(0, 0, 0);
-
 }
 
 .hiprint-printElement-vline {
@@ -259,7 +275,8 @@
   border-left: 0px none rgb(0, 0, 0) !important;
 }
 
-.hiprint-printElement-oval, .hiprint-printElement-rect {
+.hiprint-printElement-oval,
+.hiprint-printElement-rect {
   border: 0.75pt solid #000;
 }
 
@@ -309,7 +326,8 @@
   box-sizing: border-box;
 }
 
-.hi-grid-row::after, .hi-grid-row::before {
+.hi-grid-row::after,
+.hi-grid-row::before {
   display: table;
   content: '';
   box-sizing: border-box;
@@ -337,3 +355,13 @@
   text-align: left;
   clear: both;
 }
+
+/* �≦就��絎遵墾=茵��弱��絎� */
+/* .hibarcode_imgcode {
+  width: 100% !important;
+  margin: 1pt 0pt 0pt 0pt !important;
+}
+
+.hiqrcode_displayValue {
+  text-align: center;
+} */
