@@ -1,0 +1,10 @@
+{
+  "editor.formatOnSave": false,
+  "editor.formatOnType": false, // 禁止输入时自动格式化[3,5](@ref)
+  "editor.formatOnPaste": false, // 禁止粘贴时自动格式化[2,5](@ref)
+  "prettier.semi": false, // 不加分号
+  "prettier.singleQuote": true, // 使用单引号
+  "editor.defaultFormatter": null,  // 禁用所有格式化器[3](@ref)
+  "prettier.enable": false,         // 关闭 Prettier 自动格式化[5](@ref)
+  "eslint.autoFixOnSave": false     // 关闭 ESLint 自动修复[3](@ref)
+}
