@@ -181,20 +181,16 @@
             // 预制的版本，解决部分内网无法获取新版本的问题
             versions: [
               {
-                value: "0.0.58-fix",
-                info: "2024/11/03 21:23:54",
+                value: "1.0.17-beta1",
+                info: "2025/04/02 21:23:54",
               },
               {
-                value: "0.0.56",
-                info: "2023/11/19 22:43:45",
+                value: "1.0.15",
+                info: "2025/01/03 20:13:14",
               },
               {
-                value: "0.0.54-fix",
-                info: "2023/07/10 10:34:19",
-              },
-              {
-                value: "0.0.52",
-                info: "2023/05/08 17:57:53",
+                value: "1.0.13",
+                info: "2024/11/19 22:43:45",
               },
             ],
             downloadedVersions: [], // 存储已下载版本
@@ -507,7 +503,7 @@
           this.onEvents();
           // 获取配置
           this.formData = store.store;
-          this.getVersions();
+          // this.getVersions();
           this.getPrintersList();
         },
         mounted() {

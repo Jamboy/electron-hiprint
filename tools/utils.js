@@ -55,7 +55,7 @@ const schema = {
   },
   pluginVersion: {
     type: "string",
-    default: "0.0.58-fix",
+    default: "1.0.17-beta1",
   },
   logPath: {
     type: "string",
