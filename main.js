@@ -338,7 +338,7 @@ function initTray() {
   APP_TRAY = new Tray(trayPath);
 
   // 托盘提示标题
-  APP_TRAY.setToolTip("hiprint");
+  APP_TRAY.setToolTip("华上蜂打印服务");
 
   // 托盘菜单
   const trayMenuTemplate = [

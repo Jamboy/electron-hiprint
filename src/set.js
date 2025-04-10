@@ -25,6 +25,8 @@ const log = require("../tools/log");
  * @return {BrowserWindow} SET_WINDOW 设置窗口
  */
 async function createSetWindow() {
+  const projectRoot = process.cwd(); // 获取项目根目录
+  const iconPath = path.join(projectRoot, "build/icons/icon.ico");
   const windowOptions = {
     width: 440, // 窗口宽度
     height: 591, // 窗口高度
@@ -37,6 +39,7 @@ async function createSetWindow() {
       contextIsolation: false, // 设置此项为false后，才可在渲染进程中使用 electron api
       nodeIntegration: true,
     },
+    icon: iconPath,
   };
 
   // 创建设置窗口

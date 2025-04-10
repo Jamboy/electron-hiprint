@@ -10,6 +10,8 @@ const path = require("path");
 const db = require("../tools/database");
 
 function createPrintLogWindow() {
+  const projectRoot = process.cwd(); // 获取项目根目录
+  const iconPath = path.join(projectRoot, "build/icons/icon.ico");
   const windowOptions = {
     width: 1080,
     height: 600,
@@ -19,6 +21,7 @@ function createPrintLogWindow() {
       nodeIntegration: true,
       contextIsolation: false,
     },
+    icon: iconPath,
   };
 
   // 创建打印日志窗口
