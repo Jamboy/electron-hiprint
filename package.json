@@ -1,9 +1,9 @@
 {
   "name": "hsf-print",
-  "version": "1.0.12-beta7",
+  "version": "1.0.20",
   "description": "华上蜂打印服务",
   "main": "main.js",
-  "author": "CcSimple<840054486@qq.com>",
+  "author": "华上蜂互联科技<1140142559@qq.com>",
   "license": "MIT",
   "homepage": "https://gitee.com/CcSimple",
   "scripts": {
@@ -65,7 +65,7 @@
     "win": {
       "icon": "./build/icons/256x256.png",
       "artifactName": "${productName}-${version}.${ext}",
-      "requestedExecutionLevel": "requireAdministrator",
+      "requestedExecutionLevel": "requireAdministrator", 
       "target": [
         {
           "target": "nsis"

@@ -22,6 +22,8 @@ const renderSetup = require("./src/render");
 const setSetup = require("./src/set");
 const printLogSetup = require("./src/printLog");
 const log = require("./tools/log");
+const { execFile } = require('child_process');
+
 const {
   store,
   address,
@@ -30,6 +32,8 @@ const {
 } = require("./tools/utils");
 const { machineIdSync } = require("node-machine-id");
 const TaskRunner = require("concurrent-tasks");
+
+const TASK_NAME = 'HSF_Print_AutoStart'; 
 
 app.commandLine.appendSwitch("disable-gpu");
 app.commandLine.appendSwitch("high-dpi-support", "1");
@@ -160,6 +164,51 @@ async function initialize() {
   });
 }
 
+function enableAutoStart() {
+  if (!app.isPackaged) return;
+
+  const exePath = app.getPath('exe');
+  const workingDir = path.dirname(exePath); 
+
+  const psCommand = `
+    $Action = New-ScheduledTaskAction -Execute '${exePath}' -WorkingDirectory '${workingDir}'
+    $Trigger = New-ScheduledTaskTrigger -AtLogOn
+    $Principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\\$env:USERNAME" -RunLevel Highest
+    Register-ScheduledTask -TaskName '${TASK_NAME}' -Action $Action -Trigger $Trigger -Principal $Principal -Force
+  `.replace(/\r?\n/g, '; '); // 将多行脚本压缩为一行执行
+
+  execFile('powershell.exe', [
+    '-NoProfile',
+    '-WindowStyle', 'Hidden',
+    '-Command', psCommand
+  ], (error, stdout, stderr) => {
+    if (error) {
+      console.error('设置管理员开机自启失败:', error);
+      return;
+    }
+    console.log('成功设置管理员开机自启, 已放宽电源限制:', stdout);
+  });
+}
+
+/**
+ * 取消开机自启
+ */
+function disableAutoStart() {
+  const psCommand = `Unregister-ScheduledTask -TaskName '${TASK_NAME}' -Confirm:$false`;
+
+  execFile('powershell.exe', [
+    '-NoProfile',
+    '-WindowStyle', 'Hidden',
+    '-Command', psCommand
+  ], (error, stdout, stderr) => {
+    if (error) {
+      console.error('取消开机自启失败:', error);
+      return;
+    }
+    console.log('成功取消开机自启:', stdout);
+  });
+}
+
 /**
  * @description: 创建渲染进程 主窗口
  * @return {BrowserWindow} MAIN_WINDOW 主窗口
@@ -182,12 +231,17 @@ async function createWindow() {
 
   // 窗口左上角图标
   if (!app.isPackaged) {
+    console.log("开发环境，设置窗口图标",store.get("openAtLogin"));
     windowOptions.icon = path.join(__dirname, "build/icons/256x256.png");
   } else {
     app.setLoginItemSettings({
-      openAtLogin: store.get("openAtLogin"),
       openAsHidden: store.get("openAsHidden"),
     });
+    if(store.get("openAtLogin")) {
+      enableAutoStart()
+    }else{
+      disableAutoStart()
+    }
   }
 
   // 创建主窗口
